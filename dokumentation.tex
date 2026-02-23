@@ -1,0 +1,518 @@
+\documentclass[11pt,a4paper]{article}
+
+% Pakete
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+
+% Seitenränder
+\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+
+% Farben
+\definecolor{codeblue}{RGB}{0,102,204}
+\definecolor{codegray}{RGB}{128,128,128}
+\definecolor{codegreen}{RGB}{0,128,0}
+\definecolor{backcolour}{RGB}{245,245,245}
+\definecolor{accentcolor}{RGB}{0,82,147}
+
+% Code-Stil
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{codeblue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codegreen},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    frame=single,
+    rulecolor=\color{codegray}
+}
+\lstset{style=mystyle}
+
+% Kopf- und Fußzeile
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textcolor{accentcolor}{PDF zu CSV -- Technische Dokumentation}}
+\fancyhead[R]{\textcolor{accentcolor}{\thepage}}
+\fancyfoot[C]{\small BeeZubi Lernwelt GmbH}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% Titelformatierung
+\titleformat{\section}{\Large\bfseries\color{accentcolor}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{accentcolor}}{\thesubsection}{1em}{}
+
+% Hyperlink-Einstellungen
+\hypersetup{
+    colorlinks=true,
+    linkcolor=accentcolor,
+    filecolor=accentcolor,
+    urlcolor=accentcolor,
+}
+
+% Box-Stil für Hinweise
+\tcbuselibrary{skins,breakable}
+\newtcolorbox{infobox}[1][]{
+    colback=blue!5!white,
+    colframe=accentcolor,
+    fonttitle=\bfseries,
+    title=#1,
+    breakable
+}
+
+\newtcolorbox{warningbox}[1][]{
+    colback=orange!5!white,
+    colframe=orange!75!black,
+    fonttitle=\bfseries,
+    title=#1,
+    breakable
+}
+
+% Dokumentbeginn
+\begin{document}
+
+% Titelseite
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+
+    {\Huge\bfseries\textcolor{accentcolor}{PDF zu CSV}}\\[0.5cm]
+    {\Large Automatisierung der IHK-Fragengenerierung}\\[2cm]
+
+    {\large\textbf{Technische Dokumentation}}\\[0.5cm]
+    {\large Version 1.0}\\[3cm]
+
+    \begin{tabular}{ll}
+        \textbf{Technologie:} & OpenAI GPT-4.1 Vision API \\[0.3cm]
+        \textbf{Sprache:} & Python 3.12+ \\[0.3cm]
+        \textbf{Ausgabeformat:} & CSV (UTF-8 mit BOM) \\[0.3cm]
+    \end{tabular}
+
+    \vfill
+
+    {\large BeeZubi Lernwelt GmbH}\\[0.3cm]
+    {\small Januar 2026}
+\end{titlepage}
+
+% Inhaltsverzeichnis
+\tableofcontents
+\newpage
+
+% ============================================
+\section{Einführung}
+% ============================================
+
+Das Programm \texttt{pdf\_to\_csv.py} automatisiert die Erstellung von IHK-Prüfungsfragen aus PDF-Lehrbüchern. Es verwendet die OpenAI Vision API, um Buchseiten zu analysieren und daraus Single-Choice-Fragen im CSV-Format zu generieren.
+
+\subsection{Anwendungsbereich}
+
+\begin{itemize}[leftmargin=*]
+    \item Kaufleute im Einzelhandel
+    \item Kaufleute für Büromanagement
+    \item Weitere IHK-Ausbildungsberufe (durch Anpassung des Megaprompts)
+\end{itemize}
+
+\subsection{Hauptfunktionen}
+
+\begin{enumerate}[leftmargin=*]
+    \item PDF-Seiten in Bilder konvertieren
+    \item Bilder an OpenAI Vision API senden
+    \item 12--15 Prüfungsfragen pro Doppelseite generieren
+    \item Ergebnisse als CSV speichern (Excel-kompatibel)
+\end{enumerate}
+
+% ============================================
+\section{Systemanforderungen}
+% ============================================
+
+\subsection{Software}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Komponente} & \textbf{Version} & \textbf{Zweck} \\
+\midrule
+Python & 3.12+ & Laufzeitumgebung \\
+PyMuPDF (fitz) & aktuell & PDF-Verarbeitung \\
+OpenAI & aktuell & API-Kommunikation \\
+python-docx & aktuell & DOCX-Dateien lesen \\
+python-dotenv & aktuell & Umgebungsvariablen \\
+\bottomrule
+\end{tabular}
+\caption{Erforderliche Software-Komponenten}
+\end{table}
+
+\subsection{API-Zugang}
+
+\begin{itemize}[leftmargin=*]
+    \item OpenAI API-Schlüssel erforderlich
+    \item Schlüssel in \texttt{.env}-Datei speichern
+\end{itemize}
+
+% ============================================
+\section{Installation}
+% ============================================
+
+\subsection{Virtuelle Umgebung erstellen}
+
+\begin{lstlisting}[language=bash]
+# Virtuelle Umgebung erstellen
+python -m venv venv
+
+# Aktivieren (Windows)
+venv\Scripts\activate
+
+# Aktivieren (Linux/Mac)
+source venv/bin/activate
+\end{lstlisting}
+
+\subsection{Abhängigkeiten installieren}
+
+\begin{lstlisting}[language=bash]
+pip install -r requirements.txt
+\end{lstlisting}
+
+\subsection{API-Schlüssel konfigurieren}
+
+Erstellen Sie eine Datei \texttt{.env} im Projektverzeichnis:
+
+\begin{lstlisting}
+OPENAI_API_KEY=sk-ihr-api-schluessel-hier
+\end{lstlisting}
+
+\begin{warningbox}[Sicherheitshinweis]
+Der API-Schlüssel sollte niemals in Versionskontrollsysteme eingecheckt werden. Die Datei \texttt{.env} ist in \texttt{.gitignore} aufzunehmen.
+\end{warningbox}
+
+% ============================================
+\section{Programmarchitektur}
+% ============================================
+
+\subsection{Ablaufdiagramm}
+
+\begin{center}
+\begin{tcolorbox}[width=0.9\textwidth, colback=white, colframe=accentcolor]
+\centering
+\textbf{Verarbeitungsablauf}\\[0.5cm]
+\begin{tabular}{c}
+PDF-Datei laden \\
+$\downarrow$ \\
+Megaprompt aus DOCX laden \\
+$\downarrow$ \\
+\textit{Für jede Seite:} \\
+$\downarrow$ \\
+Seite $\rightarrow$ PNG-Bild (150 DPI) \\
+$\downarrow$ \\
+Bild $\rightarrow$ Base64 kodieren \\
+$\downarrow$ \\
+Megaprompt + Bild $\rightarrow$ OpenAI API \\
+$\downarrow$ \\
+Antwort validieren \& bereinigen \\
+$\downarrow$ \\
+CSV-Zeilen speichern \\
+\end{tabular}
+\end{tcolorbox}
+\end{center}
+
+\subsection{Kernkomponenten}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lp{8cm}@{}}
+\toprule
+\textbf{Funktion} & \textbf{Beschreibung} \\
+\midrule
+\texttt{lade\_megaprompt()} & Lädt den Prompt aus einer DOCX-Datei \\
+\texttt{pdf\_seite\_zu\_base64()} & Konvertiert PDF-Seite in Base64-Bild \\
+\texttt{rufe\_openai\_vision()} & Sendet Anfrage an OpenAI API \\
+\texttt{bereinige\_und\_validiere\_csv()} & Prüft und korrigiert CSV-Format \\
+\texttt{verarbeite\_seite()} & Orchestriert die Seitenverarbeitung \\
+\bottomrule
+\end{tabular}
+\caption{Hauptfunktionen des Programms}
+\end{table}
+
+\subsection{Fehlerbehandlung}
+
+Das Programm implementiert eine dreistufige Strategie:
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Megaprompt}: Vollständiger Prompt aus DOCX-Datei
+    \item \textbf{Standard}: Vereinfachter Fallback-Prompt
+    \item \textbf{Notfall}: Minimaler Prompt für problematische Seiten
+\end{enumerate}
+
+Bei Verbindungsfehlern werden bis zu 5 Wiederholungen mit exponentiellem Backoff durchgeführt.
+
+% ============================================
+\section{Verwendung}
+% ============================================
+
+\subsection{Grundlegende Syntax}
+
+\begin{lstlisting}[language=bash]
+python pdf_to_csv.py --pdf <PDF-DATEI> --prompt <MEGAPROMPT.docx> [OPTIONEN]
+\end{lstlisting}
+
+\subsection{Parameter}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llp{6cm}@{}}
+\toprule
+\textbf{Parameter} & \textbf{Standard} & \textbf{Beschreibung} \\
+\midrule
+\texttt{--pdf} & -- & Pfad zur PDF-Datei (erforderlich) \\
+\texttt{--prompt} & -- & Pfad zur Megaprompt-DOCX (erforderlich) \\
+\texttt{--start} & 1 & Erste zu verarbeitende Seite \\
+\texttt{--end} & letzte & Letzte zu verarbeitende Seite \\
+\texttt{--output} & auto & Name der Ausgabe-CSV \\
+\texttt{--model} & gpt-4.1 & OpenAI-Modell \\
+\texttt{--parallel} & 1 & Anzahl paralleler Anfragen \\
+\texttt{--test} & -- & Nur 2 Seiten verarbeiten \\
+\texttt{--book-start} & auto & Erste Buchseitennummer \\
+\bottomrule
+\end{tabular}
+\caption{Kommandozeilenparameter}
+\end{table}
+
+\subsection{Verfügbare Modelle}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Modell} & \textbf{Qualität} & \textbf{Geschwindigkeit} & \textbf{Kosten} \\
+\midrule
+gpt-4.1 & Beste & Mittel & \$2.00/1M Token \\
+gpt-4.1-mini & Sehr gut & Schnell & \$0.40/1M Token \\
+gpt-4.1-nano & Gut & Sehr schnell & \$0.10/1M Token \\
+gpt-4o & Sehr gut & Mittel & \$2.50/1M Token \\
+gpt-4o-mini & Gut & Schnell & \$0.15/1M Token \\
+\bottomrule
+\end{tabular}
+\caption{Verfügbare OpenAI-Modelle}
+\end{table}
+
+\subsection{Beispiele}
+
+\begin{infobox}[Standardverwendung]
+\begin{lstlisting}[language=bash]
+python pdf_to_csv.py --pdf Lehrbuch.pdf --prompt "Megaprompt EH.docx"
+\end{lstlisting}
+\end{infobox}
+
+\begin{infobox}[Seitenbereich mit paralleler Verarbeitung]
+\begin{lstlisting}[language=bash]
+python pdf_to_csv.py --pdf Lehrbuch.pdf --prompt "Megaprompt EH.docx" \
+    --start 50 --end 100 --parallel 3
+\end{lstlisting}
+\end{infobox}
+
+\begin{infobox}[Testmodus (nur 2 Seiten)]
+\begin{lstlisting}[language=bash]
+python pdf_to_csv.py --pdf Lehrbuch.pdf --prompt "Megaprompt EH.docx" --test
+\end{lstlisting}
+\end{infobox}
+
+% ============================================
+\section{Ausgabeformat}
+% ============================================
+
+\subsection{CSV-Struktur}
+
+Die generierte CSV-Datei verwendet:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Kodierung}: UTF-8 mit BOM (Excel-kompatibel)
+    \item \textbf{Trennzeichen}: Semikolon (\texttt{;})
+    \item \textbf{Kopfzeile}: Ja (erste Zeile)
+\end{itemize}
+
+\subsection{Spalten}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}clp{6cm}@{}}
+\toprule
+\textbf{Nr.} & \textbf{Spalte} & \textbf{Beschreibung} \\
+\midrule
+1 & Frage & Die Prüfungsfrage \\
+2 & A & Antwortmöglichkeit A \\
+3 & B & Antwortmöglichkeit B \\
+4 & C & Antwortmöglichkeit C \\
+5 & D & Antwortmöglichkeit D \\
+6 & Richtig & Richtige Antwort (A/B/C/D) \\
+7 & Richtig\_Text & Ausgeschriebene richtige Antwort \\
+8 & Thema & Unterkapitel/Stichwort \\
+9 & Quelle & Buchseiten (z.B. "`Buch S. 17--18"') \\
+10 & Status & Prüfstatus ("`ok"' oder "`prüfen"') \\
+11 & Kommentar & Optionaler Kommentar \\
+12 & Vollansicht & Kurz-Lesefassung \\
+\bottomrule
+\end{tabular}
+\caption{CSV-Spaltenstruktur}
+\end{table}
+
+% ============================================
+\section{Megaprompt-Konfiguration}
+% ============================================
+
+Der Megaprompt ist eine DOCX-Datei, die alle Anweisungen für die Fragengenerierung enthält.
+
+\subsection{Wichtige Elemente}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Rolle}: Definition der KI als Prüfungsexpertin
+    \item \textbf{Fragentypen}: W-Frage, Operator-Aufgabe, Fallvignette (im Wechsel)
+    \item \textbf{Betriebe \& Personen}: Feste Namen für Fallbeispiele
+    \item \textbf{Formatregeln}: CSV-Struktur, keine Semikolons im Text
+    \item \textbf{Qualitätskriterien}: IHK-Niveau, Praxisbezug
+\end{enumerate}
+
+\subsection{Anpassung für andere Berufe}
+
+Um das Programm für andere Ausbildungsberufe zu verwenden:
+
+\begin{enumerate}[leftmargin=*]
+    \item Kopieren Sie den vorhandenen Megaprompt
+    \item Passen Sie Betriebe und Personennamen an
+    \item Ändern Sie fachspezifische Begriffe
+    \item Speichern Sie als neue DOCX-Datei
+\end{enumerate}
+
+% ============================================
+\section{Fehlerprotokollierung}
+% ============================================
+
+Das Programm erstellt automatisch Fehler-Logs:
+
+\begin{itemize}[leftmargin=*]
+    \item \texttt{<pdf-name>\_errors.json} -- Strukturiertes JSON-Log
+    \item \texttt{<pdf-name>\_errors.txt} -- Lesbares Text-Log
+\end{itemize}
+
+\subsection{Fehlertypen}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lp{7cm}@{}}
+\toprule
+\textbf{Code} & \textbf{Beschreibung} \\
+\midrule
+CONTENT\_POLICY & API hat Inhalt abgelehnt \\
+KEIN\_TEXT & Seite enthält nicht genug Text \\
+NUR\_BILD & Seite enthält nur Bilder/Diagramme \\
+UNGUELTIG\_CSV & Antwort nicht im CSV-Format \\
+VERBINDUNG & Netzwerkfehler \\
+RATE\_LIMIT & API-Anfragelimit erreicht \\
+ZEITÜBERSCHREITUNG & Timeout überschritten \\
+\bottomrule
+\end{tabular}
+\caption{Mögliche Fehlertypen}
+\end{table}
+
+% ============================================
+\section{Best Practices}
+% ============================================
+
+\begin{infobox}[Empfehlungen für optimale Ergebnisse]
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{OCR-Qualität}: Verwenden Sie gut gescannte PDFs mit OCR
+    \item \textbf{Parallele Verarbeitung}: Maximal 3 parallele Anfragen
+    \item \textbf{Testlauf}: Immer zuerst \texttt{--test} verwenden
+    \item \textbf{Seitenbereich}: Bei großen PDFs in Abschnitten verarbeiten
+    \item \textbf{Validierung}: Generierte Fragen manuell prüfen
+\end{enumerate}
+\end{infobox}
+
+\begin{warningbox}[Wichtige Hinweise]
+\begin{itemize}[leftmargin=*]
+    \item API-Kosten beachten (ca. \$0.02 pro Seite bei gpt-4.1)
+    \item Keine Semikolons in Fragen/Antworten verwenden
+    \item Bei Verbindungsproblemen \texttt{--parallel 1} nutzen
+\end{itemize}
+\end{warningbox}
+
+% ============================================
+\section{Technische Details}
+% ============================================
+
+\subsection{Bildkonvertierung}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Auflösung}: 150 DPI (konfigurierbar)
+    \item \textbf{Format}: PNG
+    \item \textbf{Kodierung}: Base64 für API-Übertragung
+\end{itemize}
+
+\subsection{API-Parameter}
+
+\begin{lstlisting}[language=Python]
+client.chat.completions.create(
+    model="gpt-4.1",
+    messages=[...],
+    max_tokens=4096,
+    temperature=0.7,
+    timeout=120
+)
+\end{lstlisting}
+
+\subsection{Retry-Logik}
+
+\begin{itemize}[leftmargin=*]
+    \item Maximale Versuche: 5
+    \item Basis-Wartezeit: 2 Sekunden
+    \item Maximale Wartezeit: 60 Sekunden
+    \item Exponentieller Backoff mit Jitter
+\end{itemize}
+
+% ============================================
+\section{Anhang}
+% ============================================
+
+\subsection{Projektstruktur}
+
+\begin{lstlisting}
+PDF_in_csv_automation_mit_APIKeys/
+    pdf_to_csv.py          # Hauptprogramm
+    requirements.txt        # Abhangigkeiten
+    .env                   # API-Schlussel (nicht versioniert)
+    .env.example           # Vorlage fur .env
+    Megaprompt *.docx      # Prompt-Dateien
+    *.pdf                  # Eingabe-PDFs
+    *_questions.csv        # Generierte Fragen
+    *_errors.json          # Fehler-Logs
+\end{lstlisting}
+
+\subsection{Kontakt}
+
+Bei Fragen oder Problemen wenden Sie sich an:\\
+\textbf{BeeZubi Lernwelt GmbH}
+
+\vfill
+
+\begin{center}
+\textcolor{codegray}{\small Dokumentation erstellt: Januar 2026}
+\end{center}
+
+\end{document}
