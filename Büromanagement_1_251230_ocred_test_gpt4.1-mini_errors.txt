@@ -1,0 +1,65 @@
+
+============================================================
+[2026-01-16T14:01:45.975343] PDF-Seite 9 (Buch S. 17-18)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:02:11.827199] PDF-Seite 10 (Buch S. 19-20)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:02:30.982402] PDF-Seite 11 (Buch S. 21-22)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:02:57.306060] PDF-Seite 12 (Buch S. 23-24)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:03:34.509783] PDF-Seite 13 (Buch S. 25-26)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:03:50.728244] PDF-Seite 14 (Buch S. 27-28)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:04:28.730374] PDF-Seite 15 (Buch S. 29-30)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:05:07.039614] PDF-Seite 16 (Buch S. 31-32)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:05:34.019813] PDF-Seite 17 (Buch S. 33-34)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:06:00.423325] PDF-Seite 18 (Buch S. 35-36)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:06:29.357989] PDF-Seite 19 (Buch S. 37-38)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:07:07.113264] PDF-Seite 20 (Buch S. 39-40)
+Typ: UNBEKANNT
+Nachricht: Unbekannter Fehler - Detail: Connection error.
+
+============================================================
+[2026-01-16T14:27:57.740563] PDF-Seite 67 (Buch S. 133-134)
+Typ: NUR_BILD
+Nachricht: Die Seite enthält nur Bilder/Diagramme
