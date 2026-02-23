@@ -1,5 +1,0 @@
-
-============================================================
-[2026-01-16T12:50:52.413127] PDF-Seite 162 (Buch S. 323-324)
-Typ: NUR_BILD
-Nachricht: Die Seite enthält nur Bilder/Diagramme

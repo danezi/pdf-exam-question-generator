@@ -1,5 +1,0 @@
-
-============================================================
-[2026-01-16T17:18:35.619566] PDF-Seite 67 (Buch S. 133-134)
-Typ: NUR_BILD
-Nachricht: Die Seite enthält nur Bilder/Diagramme
