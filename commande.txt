@@ -1,0 +1,35 @@
+python pdf_to_csv.py --pdf   Büromanagement_2_260104_ocred.pdf  --prompt Megaprompt_26_01_12_Büro.docx --model gpt-5.1 --start 8 --end 10  
+
+
+
+Ameleorer pour mieux connaitre les pages..
+
+C'est amélioré. Voici les changements :
+
+Nouveau comportement par défaut :
+
+PDF-Seite 8 = Buchseite 8 (plus simple)
+Nouvelles options :
+
+--single-page : Pour les PDFs où 1 page = 1 page du livre
+
+
+python pdf_to_csv.py --pdf buch.pdf --prompt megaprompt.docx --start 8 --end 182 --single-page
+--book-start : Si la numérotation du livre est différente
+
+
+# PDF-Seite 8 = Buchseite 15
+python pdf_to_csv.py --pdf buch.pdf --prompt megaprompt.docx --start 8 --book-start 15
+Exemples d'utilisation :
+
+
+# Doppelseiten (défaut): PDF page 8 → Buch S. 8-9, page 9 → Buch S. 10-11
+python pdf_to_csv.py --pdf buch.pdf --prompt megaprompt.docx --start 8 --end 182
+
+# Einzelseiten: PDF page 8 → Buch S. 8, page 9 → Buch S. 9
+python pdf_to_csv.py --pdf buch.pdf --prompt megaprompt.docx --start 8 --end 182 --single-page
+
+# Buchseite beginnt bei 15: PDF page 8 → Buch S. 15-16
+python pdf_to_csv.py --pdf buch.pdf --prompt megaprompt.docx --start 8 --book-start 15
+
+

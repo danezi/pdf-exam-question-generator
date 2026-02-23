@@ -1,0 +1,17 @@
+# Tout ignorer par défaut
+*
+
+# Autoriser les dossiers
+!*/
+
+# Autoriser uniquement .py, .txt, .gitignore et README
+!*.py
+!*.txt
+!.gitignore
+!README.md
+
+# Exclure les dossiers inutiles même s'ils contiennent des .py
+venv/
+__pycache__/
+*.egg-info/
+.env
