@@ -85,6 +85,40 @@ MEGAPROMPT_INHALT = None
 stop_event = Event()
 wurde_unterbrochen = False
 
+# Progress-Tracking (Resume-System)
+PROGRESS_PFAD = None
+ERLEDIGTE_SEITEN = set()
+
+
+def lade_progress(progress_pfad: str) -> set:
+    """Lädt bereits verarbeitete Seiten aus dem Progress-File."""
+    if os.path.exists(progress_pfad):
+        try:
+            with open(progress_pfad, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return set(data.get("erledigte_seiten", []))
+        except Exception:
+            return set()
+    return set()
+
+
+def speichere_progress(progress_pfad: str, seite: int):
+    """Fügt eine erledigte Seite zum Progress-File hinzu (thread-sicher)."""
+    with schreib_lock:
+        ERLEDIGTE_SEITEN.add(seite)
+        with open(progress_pfad, "w", encoding="utf-8") as f:
+            json.dump({
+                "erledigte_seiten": sorted(list(ERLEDIGTE_SEITEN)),
+                "letzte_aktualisierung": datetime.now().isoformat()
+            }, f, ensure_ascii=False, indent=2)
+
+
+def loesche_progress(progress_pfad: str):
+    """Löscht das Progress-File nach erfolgreichem Abschluss."""
+    if os.path.exists(progress_pfad):
+        os.remove(progress_pfad)
+        print("   ✓ Progress-Datei gelöscht (Verarbeitung vollständig)")
+
 
 def signal_handler(sig, frame):
     """Handler für Ctrl+C - setzt Stop-Flag statt sofort zu beenden."""
@@ -96,13 +130,21 @@ def signal_handler(sig, frame):
 
 
 def schreibe_ergebnis_sofort(ausgabe_pfad: str, ergebnis: dict, statistik: dict):
-    """Schreibt ein Ergebnis sofort in die CSV-Datei (thread-sicher)."""
+    """Schreibt ein Ergebnis sofort in die CSV-Datei und aktualisiert den Progress (thread-sicher)."""
     with schreib_lock:
         if not ergebnis["fehler"] and ergebnis["csv_inhalt"]:
             with open(ausgabe_pfad, "a", encoding="utf-8-sig", newline="") as csv_datei:
                 csv_datei.write(ergebnis["csv_inhalt"] + "\n")
             statistik["erfolg"] += 1
             statistik["fragen_generiert"] += ergebnis["anzahl_fragen"]
+            # Progress speichern
+            if PROGRESS_PFAD:
+                ERLEDIGTE_SEITEN.add(ergebnis["pdf_seite"])
+                with open(PROGRESS_PFAD, "w", encoding="utf-8") as f:
+                    json.dump({
+                        "erledigte_seiten": sorted(list(ERLEDIGTE_SEITEN)),
+                        "letzte_aktualisierung": datetime.now().isoformat()
+                    }, f, ensure_ascii=False, indent=2)
 
 
 def lade_megaprompt(docx_pfad: str) -> str:
@@ -565,7 +607,7 @@ def verarbeite_seite_wrapper(args: tuple) -> dict:
 
 
 def main():
-    global MEGAPROMPT_INHALT
+    global MEGAPROMPT_INHALT, PROGRESS_PFAD, ERLEDIGTE_SEITEN
 
     parser = argparse.ArgumentParser(
         description="Konvertiert ein PDF in Fragen-CSV via OpenAI Vision",
@@ -654,8 +696,14 @@ def main():
         ausgabe_pfad = f"{pdf_name}_questions.csv"
 
     fehler_log_pfad = ausgabe_pfad.replace(".csv", "_errors.json")
+    PROGRESS_PFAD = ausgabe_pfad.replace(".csv", "_progress.json")
     print(f"\n📁 Ausgabe: {ausgabe_pfad}")
     print(f"   Fehler-Log: {fehler_log_pfad}")
+
+    # Resume: bereits erledigte Seiten laden
+    ERLEDIGTE_SEITEN = lade_progress(PROGRESS_PFAD)
+    if ERLEDIGTE_SEITEN:
+        print(f"\n🔄 RESUME ERKANNT: {len(ERLEDIGTE_SEITEN)} Seiten bereits verarbeitet → werden übersprungen")
 
     # Buchseitennummer - Standard: PDF-Seite = Buchseite
     if args.book_start:
@@ -703,10 +751,14 @@ def main():
         "fehler_nach_typ": {}
     }
 
-    # Aufgaben vorbereiten
+    # Aufgaben vorbereiten (bereits erledigte Seiten überspringen)
     aufgaben = []
     for seiten_nr in range(start_seite - 1, end_seite):
         pdf_seite = seiten_nr + 1
+
+        if pdf_seite in ERLEDIGTE_SEITEN:
+            continue  # Resume: Seite bereits verarbeitet
+
         seiten_index = seiten_nr - (start_seite - 1)
 
         if seiten_pro_pdf == 1:
@@ -807,6 +859,8 @@ def main():
                     statistik["fragen_generiert"] += anzahl
                     with open(ausgabe_pfad, "a", encoding="utf-8-sig", newline="") as csv_datei:
                         csv_datei.write(csv_inhalt + "\n")
+                    if PROGRESS_PFAD:
+                        speichere_progress(PROGRESS_PFAD, pdf_seite)
                     print(f"\n✅ OK: {anzahl} Fragen generiert (gespeichert)")
         finally:
             pdf_doc.close()
@@ -846,9 +900,10 @@ def main():
         print("\n✅ Keine Fehler!")
 
     if wurde_unterbrochen:
-        naechste_seite = start_seite + verarbeitete_seiten
-        print(f"\n💡 Zum Fortsetzen ab Seite {naechste_seite}:")
-        print(f"   --start {naechste_seite}")
+        print(f"\n💡 Zum Fortsetzen: Starte das Programm mit denselben Parametern neu.")
+        print(f"   Das Resume-System springt automatisch zu den noch nicht verarbeiteten Seiten.")
+    else:
+        loesche_progress(PROGRESS_PFAD)
 
 
 if __name__ == "__main__":
