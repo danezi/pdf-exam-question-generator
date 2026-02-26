@@ -653,6 +653,136 @@ def verarbeite_seite_wrapper(args: tuple) -> dict:
     return ergebnis
 
 
+def schreibe_protokoll_zeile(
+    protokoll_pfad: str,
+    pdf_pfad: str,
+    prompt_pfad: str,
+    modell: str,
+    start_seite: int,
+    end_seite: int,
+    statistik: dict,
+    metriken_liste: list,
+    dauer_s: float,
+    parallel: int,
+    single_page: bool,
+    unterbrochen: bool,
+    ausgabe_pfad: str,
+    metriken_pfad: str,
+):
+    """
+    Fügt eine Zeile in das zentrale Excel-Protokoll ein.
+    Erstellt die Datei mit formatierter Kopfzeile wenn sie noch nicht existiert.
+    Erfordert: pip install openpyxl
+    """
+    from openpyxl import Workbook, load_workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    SPALTEN = [
+        "Datum", "Uhrzeit", "PDF", "Megaprompt", "Modell",
+        "Seiten_Bereich", "Seiten_Gesamt", "Seiten_Erfolg", "Seiten_Fehler", "Erfolgsrate_%",
+        "Fragen_Gesamt", "Fragen_pro_Seite", "API_Aufrufe_Gesamt",
+        "Tokens_Eingabe", "Tokens_Ausgabe", "Tokens_Gesamt",
+        "Dauer_Minuten", "Zeit_pro_Seite_s", "Parallelität", "Seitenmodus",
+        "Dominante_Strategie", "Fehler_nach_Typ", "Unterbrochen",
+        "CSV_Pfad", "Metriken_Pfad",
+    ]
+
+    SPALTENBREITEN = {
+        "Datum": 14, "Uhrzeit": 12, "PDF": 35, "Megaprompt": 35, "Modell": 12,
+        "Seiten_Bereich": 14, "Seiten_Gesamt": 14, "Seiten_Erfolg": 14,
+        "Seiten_Fehler": 14, "Erfolgsrate_%": 13, "Fragen_Gesamt": 14,
+        "Fragen_pro_Seite": 16, "API_Aufrufe_Gesamt": 18,
+        "Tokens_Eingabe": 16, "Tokens_Ausgabe": 16, "Tokens_Gesamt": 14,
+        "Dauer_Minuten": 15, "Zeit_pro_Seite_s": 16, "Parallelität": 13,
+        "Seitenmodus": 13, "Dominante_Strategie": 20, "Fehler_nach_Typ": 40,
+        "Unterbrochen": 13, "CSV_Pfad": 50, "Metriken_Pfad": 50,
+    }
+
+    # Werte berechnen
+    verarbeitet = statistik["erfolg"] + statistik["fehlgeschlagen"]
+    erfolgsrate = round(100 * statistik["erfolg"] / max(1, verarbeitet), 1)
+    fragen_pro_seite = round(statistik["fragen_generiert"] / max(1, statistik["erfolg"]), 1)
+    tokens_ein = sum(m.get("tokens_eingabe", 0) for m in metriken_liste)
+    tokens_aus = sum(m.get("tokens_ausgabe", 0) for m in metriken_liste)
+    tokens_ges = sum(m.get("tokens_gesamt", 0) for m in metriken_liste)
+    api_aufrufe = sum(m.get("api_aufrufe", 0) for m in metriken_liste)
+    zeit_pro_seite = round(dauer_s / max(1, verarbeitet), 1)
+
+    # Dominante Strategie
+    strategie_zaehler = {}
+    for m in metriken_liste:
+        s = m.get("strategie")
+        if s:
+            strategie_zaehler[s] = strategie_zaehler.get(s, 0) + 1
+    dominante_strategie = max(strategie_zaehler, key=strategie_zaehler.get) if strategie_zaehler else "—"
+
+    # Fehler nach Typ
+    fehler_str = " | ".join(
+        f"{typ}: {anz}" for typ, anz in statistik.get("fehler_nach_typ", {}).items()
+    ) or "—"
+
+    jetzt = datetime.now()
+    zeilen_daten = [
+        jetzt.strftime("%Y-%m-%d"),
+        jetzt.strftime("%H:%M:%S"),
+        Path(pdf_pfad).name,
+        Path(prompt_pfad).name,
+        modell,
+        f"{start_seite}–{end_seite}",
+        statistik["gesamt_seiten"],
+        statistik["erfolg"],
+        statistik["fehlgeschlagen"],
+        erfolgsrate,
+        statistik["fragen_generiert"],
+        fragen_pro_seite,
+        api_aufrufe,
+        tokens_ein,
+        tokens_aus,
+        tokens_ges,
+        round(dauer_s / 60, 1),
+        zeit_pro_seite,
+        parallel,
+        "Einzel" if single_page else "Doppel",
+        dominante_strategie,
+        fehler_str,
+        "JA" if unterbrochen else "NEIN",
+        ausgabe_pfad,
+        metriken_pfad,
+    ]
+
+    # Excel öffnen oder neu erstellen
+    if os.path.exists(protokoll_pfad):
+        wb = load_workbook(protokoll_pfad)
+        ws = wb.active
+    else:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Protokoll"
+
+        # Kopfzeile mit blauem Hintergrund
+        for col_idx, spalte in enumerate(SPALTEN, 1):
+            zelle = ws.cell(row=1, column=col_idx, value=spalte)
+            zelle.font = Font(bold=True, color="FFFFFF")
+            zelle.fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+            zelle.alignment = Alignment(horizontal="center", wrap_text=False)
+
+        # Spaltenbreiten setzen
+        for col_idx, spalte in enumerate(SPALTEN, 1):
+            breite = SPALTENBREITEN.get(spalte, 15)
+            ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = breite
+
+        # Erste Zeile einfrieren (Kopfzeile bleibt beim Scrollen sichtbar)
+        ws.freeze_panes = "A2"
+
+    # Datenzeile einfügen
+    zeile_nr = ws.max_row + 1
+    for col_idx, wert in enumerate(zeilen_daten, 1):
+        ws.cell(row=zeile_nr, column=col_idx, value=wert)
+
+    wb.save(protokoll_pfad)
+    print(f"   Protokoll: {protokoll_pfad} (Zeile {zeile_nr - 1})")
+
+
 def main():
     global MEGAPROMPT_INHALT, PROGRESS_PFAD, ERLEDIGTE_SEITEN, METRIKEN_LISTE
 
@@ -991,6 +1121,32 @@ def main():
             print(f"   - {f_typ}: {anzahl} Seite(n)")
     elif not wurde_unterbrochen:
         print("\n✅ Keine Fehler!")
+
+    # Protokoll-Zeile ins Excel schreiben
+    protokoll_pfad = os.path.join(os.path.dirname(os.path.abspath(__file__)), "protokoll.xlsx")
+    try:
+        schreibe_protokoll_zeile(
+            protokoll_pfad=protokoll_pfad,
+            pdf_pfad=pdf_pfad,
+            prompt_pfad=prompt_pfad,
+            modell=args.model,
+            start_seite=start_seite,
+            end_seite=end_seite,
+            statistik=statistik,
+            metriken_liste=METRIKEN_LISTE,
+            dauer_s=dauer,
+            parallel=args.parallel,
+            single_page=args.single_page,
+            unterbrochen=wurde_unterbrochen,
+            ausgabe_pfad=ausgabe_pfad,
+            metriken_pfad=metriken_pfad,
+        )
+    except ImportError:
+        print("\n   ⚠️  Protokoll nicht geschrieben — bitte 'pip install openpyxl' ausführen")
+    except PermissionError:
+        print("\n   ⚠️  Protokoll gesperrt — bitte protokoll.xlsx in Excel schließen und nochmals starten")
+    except Exception as e:
+        print(f"\n   ⚠️  Protokoll-Fehler: {e}")
 
     if wurde_unterbrochen:
         print(f"\n💡 Zum Fortsetzen: Starte das Programm mit denselben Parametern neu.")
