@@ -33,3 +33,14 @@ python pdf_to_csv.py --pdf buch.pdf --prompt megaprompt.docx --start 8 --end 182
 python pdf_to_csv.py --pdf buch.pdf --prompt megaprompt.docx --start 8 --book-start 15
 
 
+
+
+
+
+python pdf_to_csv.py --pdf Friseur_ocred.pdf --prompt Megaprompt_26_02_02_Friseur.docx --model gpt-5.2 --start 11 --end 406 --parallel 5 --single-page --book-start 1 
+
+--book-start 1 indique au programme que la première page traitée du PDF correspond à la page 1 du livre.
+Dans votre cas :
+PDF page 11 → Buch S. 1
+PDF page 12 → Buch S. 2
+PDF page 406 → Buch S. 396
