@@ -89,6 +89,9 @@ wurde_unterbrochen = False
 PROGRESS_PFAD = None
 ERLEDIGTE_SEITEN = set()
 
+# Metriken-Sammlung (Étape 2)
+METRIKEN_LISTE = []
+
 
 def lade_progress(progress_pfad: str) -> set:
     """Lädt bereits verarbeitete Seiten aus dem Progress-File."""
@@ -380,7 +383,7 @@ def rufe_openai_vision(client: OpenAI, base64_bild: str, prompt: str, modell: st
         api_params["max_tokens"] = 4096
 
     antwort = client.chat.completions.create(**api_params)
-    return antwort.choices[0].message.content
+    return antwort.choices[0].message.content, antwort.usage
 
 
 def bereinige_und_validiere_csv(antwort: str) -> tuple[str, int, list]:
@@ -495,19 +498,36 @@ def verarbeite_seite(
     seiten_info: str,
     modell: str = "gpt-4.1",
     fehler_log_pfad: str = None
-) -> tuple[str, str, str, int]:
+) -> tuple[str, str, str, int, dict]:
     """
     Verarbeitet eine PDF-Seite mit Retry und Prompt-Strategien.
-    Rückgabe: (csv_inhalt, fehler_nachricht, fehler_typ, anzahl_fragen)
+    Rückgabe: (csv_inhalt, fehler_nachricht, fehler_typ, anzahl_fragen, metriken)
     """
     letzte_antwort = None
+    seite_startzeit = time.time()
+    api_aufrufe = 0
+
+    metriken = {
+        "strategie": None,
+        "api_aufrufe": 0,
+        "tokens_eingabe": 0,
+        "tokens_ausgabe": 0,
+        "tokens_gesamt": 0,
+        "antwortzeit_s": 0.0,
+        "gesamtzeit_s": 0.0,
+        "fehler_typ": None,
+        "anzahl_fragen": 0,
+        "erfolg": False,
+    }
 
     # Kombinierte Analyse und Konvertierung (schneller, nur 1x PDF-Zugriff)
     try:
         meta, base64_bild = analysiere_und_konvertiere_seite(pdf_doc, seiten_nr)
     except Exception as e:
         fehler_typ, fehler_msg = erkenne_fehlertyp(None, e)
-        return None, fehler_msg, fehler_typ, 0
+        metriken["fehler_typ"] = fehler_typ
+        metriken["gesamtzeit_s"] = round(time.time() - seite_startzeit, 2)
+        return None, fehler_msg, fehler_typ, 0, metriken
 
     # Strategie-Reihenfolge dynamisch
     if meta["ist_bildlastig"]:
@@ -532,7 +552,10 @@ def verarbeite_seite(
                     print(f"  [{strategie_name.upper()}] Wiederholung {versuch + 1}/{MAX_VERSUCHE}...")
 
                 prompt = prompt_func(seiten_info)
-                antwort = rufe_openai_vision(client, base64_bild, prompt, modell)
+                call_start = time.time()
+                antwort, usage = rufe_openai_vision(client, base64_bild, prompt, modell)
+                call_dauer = round(time.time() - call_start, 2)
+                api_aufrufe += 1
                 letzte_antwort = antwort
 
                 csv_inhalt, anzahl_fragen, validierungs_fehler = bereinige_und_validiere_csv(antwort)
@@ -545,12 +568,27 @@ def verarbeite_seite(
                     if strategie_idx < len(strategien) - 1:
                         print("  → Keine gültigen Fragen, wechsle Strategie...")
                         break
-                    return None, "Keine gültigen CSV-Zeilen generiert", "UNGUELTIG_CSV", 0
+                    metriken["api_aufrufe"] = api_aufrufe
+                    metriken["gesamtzeit_s"] = round(time.time() - seite_startzeit, 2)
+                    metriken["fehler_typ"] = "UNGUELTIG_CSV"
+                    return None, "Keine gültigen CSV-Zeilen generiert", "UNGUELTIG_CSV", 0, metriken
+
+                # Erfolg!
+                metriken["strategie"] = strategie_name
+                metriken["api_aufrufe"] = api_aufrufe
+                metriken["tokens_eingabe"] = usage.prompt_tokens if usage else 0
+                metriken["tokens_ausgabe"] = usage.completion_tokens if usage else 0
+                metriken["tokens_gesamt"] = usage.total_tokens if usage else 0
+                metriken["antwortzeit_s"] = call_dauer
+                metriken["gesamtzeit_s"] = round(time.time() - seite_startzeit, 2)
+                metriken["anzahl_fragen"] = anzahl_fragen
+                metriken["erfolg"] = True
 
                 print(f"  ✓ {anzahl_fragen} gültige Fragen")
-                return csv_inhalt, None, None, anzahl_fragen
+                return csv_inhalt, None, None, anzahl_fragen, metriken
 
             except Exception as e:
+                api_aufrufe += 1
                 fehler_typ, fehler_msg = erkenne_fehlertyp(letzte_antwort, e)
 
                 # Retry bei technischen Fehlern
@@ -563,7 +601,10 @@ def verarbeite_seite(
                         continue
                     else:
                         print(f"  ❌ {fehler_typ}: Max. Versuche erreicht für {strategie_name}")
-                        return None, fehler_msg, fehler_typ, 0
+                        metriken["api_aufrufe"] = api_aufrufe
+                        metriken["gesamtzeit_s"] = round(time.time() - seite_startzeit, 2)
+                        metriken["fehler_typ"] = fehler_typ
+                        return None, fehler_msg, fehler_typ, 0, metriken
 
                 # Nicht-technischer Fehler: Strategie wechseln
                 print(f"  ❌ {fehler_typ}: {str(e)[:80]}")
@@ -572,7 +613,10 @@ def verarbeite_seite(
                     time.sleep(2)
                     break
 
-    return None, "Alle Strategien fehlgeschlagen", "UNBEKANNT", 0
+    metriken["api_aufrufe"] = api_aufrufe
+    metriken["gesamtzeit_s"] = round(time.time() - seite_startzeit, 2)
+    metriken["fehler_typ"] = "UNBEKANNT"
+    return None, "Alle Strategien fehlgeschlagen", "UNBEKANNT", 0, metriken
 
 
 def verarbeite_seite_wrapper(args: tuple) -> dict:
@@ -585,13 +629,14 @@ def verarbeite_seite_wrapper(args: tuple) -> dict:
         "csv_inhalt": None,
         "fehler": None,
         "fehler_typ": None,
-        "anzahl_fragen": 0
+        "anzahl_fragen": 0,
+        "metriken": {}
     }
 
     try:
         # PDF für diesen Thread öffnen
         pdf_doc = fitz.open(pdf_pfad)
-        csv_inhalt, fehler, fehler_typ, anzahl = verarbeite_seite(
+        csv_inhalt, fehler, fehler_typ, anzahl, metriken = verarbeite_seite(
             client, pdf_doc, seiten_nr, seiten_info, modell, fehler_log_pfad
         )
         pdf_doc.close()
@@ -599,15 +644,17 @@ def verarbeite_seite_wrapper(args: tuple) -> dict:
         ergebnis["fehler"] = fehler
         ergebnis["fehler_typ"] = fehler_typ
         ergebnis["anzahl_fragen"] = anzahl
+        ergebnis["metriken"] = metriken
     except Exception as e:
         ergebnis["fehler"] = str(e)
         ergebnis["fehler_typ"] = "UNBEKANNT"
+        ergebnis["metriken"] = {"api_aufrufe": 0, "erfolg": False, "fehler_typ": "UNBEKANNT"}
 
     return ergebnis
 
 
 def main():
-    global MEGAPROMPT_INHALT, PROGRESS_PFAD, ERLEDIGTE_SEITEN
+    global MEGAPROMPT_INHALT, PROGRESS_PFAD, ERLEDIGTE_SEITEN, METRIKEN_LISTE
 
     parser = argparse.ArgumentParser(
         description="Konvertiert ein PDF in Fragen-CSV via OpenAI Vision",
@@ -697,6 +744,7 @@ def main():
 
     fehler_log_pfad = ausgabe_pfad.replace(".csv", "_errors.json")
     PROGRESS_PFAD = ausgabe_pfad.replace(".csv", "_progress.json")
+    metriken_pfad = ausgabe_pfad.replace(".csv", "_metriken.json")
     print(f"\n📁 Ausgabe: {ausgabe_pfad}")
     print(f"   Fehler-Log: {fehler_log_pfad}")
 
@@ -812,6 +860,13 @@ def main():
                     seiten_info = ergebnis["seiten_info"]
                     print(f"\n[Seite {pdf_seite}] {seiten_info}")
 
+                    # Metriken sammeln
+                    if ergebnis.get("metriken"):
+                        m = ergebnis["metriken"]
+                        m["pdf_seite"] = pdf_seite
+                        m["seiten_info"] = seiten_info
+                        METRIKEN_LISTE.append(m)
+
                     if ergebnis["fehler"]:
                         statistik["fehlgeschlagen"] += 1
                         fehler_typ = ergebnis["fehler_typ"] or "UNBEKANNT"
@@ -842,9 +897,14 @@ def main():
                 print(f"Seite {pdf_seite}/{gesamt_seiten} ({seiten_info})")
                 print(f"{'=' * 60}")
 
-                csv_inhalt, fehler, fehler_typ, anzahl = verarbeite_seite(
+                csv_inhalt, fehler, fehler_typ, anzahl, metriken = verarbeite_seite(
                     client, pdf_doc, aufgabe[2], seiten_info, args.model, fehler_log_pfad
                 )
+
+                # Metriken sammeln
+                metriken["pdf_seite"] = pdf_seite
+                metriken["seiten_info"] = seiten_info
+                METRIKEN_LISTE.append(metriken)
 
                 if fehler:
                     statistik["fehlgeschlagen"] += 1
@@ -887,6 +947,39 @@ def main():
     print(f"   Fragen generiert: {statistik['fragen_generiert']}")
     if statistik["erfolg"] > 0:
         print(f"   Ø Fragen/Seite: {statistik['fragen_generiert']/statistik['erfolg']:.1f}")
+
+    # Metriken speichern
+    if METRIKEN_LISTE:
+        gesamt_tokens = sum(m.get("tokens_gesamt", 0) for m in METRIKEN_LISTE)
+        gesamt_api_aufrufe = sum(m.get("api_aufrufe", 0) for m in METRIKEN_LISTE)
+        metriken_export = {
+            "lauf_info": {
+                "pdf": pdf_pfad,
+                "megaprompt": prompt_pfad,
+                "modell": args.model,
+                "start_seite": start_seite,
+                "end_seite": end_seite,
+                "parallel": args.parallel,
+                "startzeit": datetime.fromtimestamp(startzeit).isoformat(),
+                "endzeit": datetime.now().isoformat(),
+                "dauer_s": round(dauer, 2),
+                "unterbrochen": wurde_unterbrochen,
+            },
+            "zusammenfassung": {
+                "seiten_gesamt": statistik["gesamt_seiten"],
+                "seiten_erfolg": statistik["erfolg"],
+                "seiten_fehler": statistik["fehlgeschlagen"],
+                "fragen_gesamt": statistik["fragen_generiert"],
+                "api_aufrufe_gesamt": gesamt_api_aufrufe,
+                "tokens_gesamt": gesamt_tokens,
+            },
+            "seiten": sorted(METRIKEN_LISTE, key=lambda x: x.get("pdf_seite", 0)),
+        }
+        with open(metriken_pfad, "w", encoding="utf-8") as f:
+            json.dump(metriken_export, f, ensure_ascii=False, indent=2)
+        print(f"\n📊 Metriken gespeichert: {metriken_pfad}")
+        print(f"   API-Aufrufe gesamt: {gesamt_api_aufrufe}")
+        print(f"   Tokens gesamt: {gesamt_tokens:,}")
 
     print("\n📁 DATEIEN:")
     print(f"   CSV: {ausgabe_pfad}")
